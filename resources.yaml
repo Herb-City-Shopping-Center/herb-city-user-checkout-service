@@ -9,7 +9,7 @@ spec:
     app: herb-city-user-checkout-service-image
   ports:
   - protocol: TCP
-    port: 5001
+    port: 80
     targetPort: 5001
     nodePort: 31140
 ---
@@ -33,4 +33,4 @@ spec:
       - name: nodeserver
         image: us-west2-docker.pkg.dev/herb-city/herb-city-user-checkout-service-repo/herb-city-user-checkout-service-image:tag
         ports:
-        - containerPort: 5001
+        - containerPort: 80
