@@ -32,3 +32,5 @@ app.use("/api/payment", checkOutRoutes);
 
 app.use(errorHandler);
 app.use(notFound);
+
+module.exports= {app,server}
