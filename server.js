@@ -17,7 +17,7 @@ app.use(express.json());
 app.use(express.static("public"));
 
 app.get("/", (req, res) => {
-  res.send("Api is running for HERB CITY email service and CI/CD on google cloud");
+  res.send("Api is running for HERB CITY checkout service and CI/CD on google cloud");
 });
 
 const server = app.listen(
