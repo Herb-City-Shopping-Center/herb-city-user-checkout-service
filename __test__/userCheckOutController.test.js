@@ -1,55 +1,61 @@
 const request = require('supertest');
 const { app, server } = require('../server'); // Assuming your Express app is exported from app.js
-const { getAllProducts } = require('../controllers/userController');
-const Product = require('../models/productModal');
+const { checkOut } = require('../controllers/checkOutControllers');
 const connectDB = require('../DB/db'); // Import the function to connect to the database
 const { default: mongoose } = require('mongoose');
 
-describe('getAllProducts', () => {
+// const { app } = require('../server'); // Ensure your Express app is exported from this file
+const stripe = require('stripe')(); // Normally you would mock this
 
-    beforeAll(async () => {
-      await connectDB();
+// Mocking stripe.checkout.sessions.create to not call the actual Stripe API
+jest.mock('stripe', () => () => ({
+  checkout: {
+    sessions: {
+      create: jest.fn()
+    }
+  }
+}));
+
+describe('POST /create-checkout-session', () => {
+  beforeAll(async () => {
+    await connectDB();
+  }, 30000);
+
+  test('should create a checkout session and return session URL on success', async () => {
+    const items = [{ productTitle: 'Test Product', productPrice: 10, quantity: 1 }];
+    stripe.checkout.sessions.create.mockResolvedValueOnce({
+      url: 'http://localhost:3000/order/review'
     });
 
-    test('should return status 400 if no products exist', async () => {
+    const response = await request(app)
+      .post('/api/create-checkout-session')
+      .send({ items });
 
-        Product.find = jest.fn().mockResolvedValue([]);
+    expect(response.status).toBe(200);
+    expect(response.body.url).toBe('http://localhost:3000/order/review');
+    expect(stripe.checkout.sessions.create).toHaveBeenCalledWith(expect.objectContaining({
+      payment_method_types: ['card'],
+      mode: 'payment',
+      line_items: expect.any(Array)
+    }));
+  });
 
-        const response = await request(app).post('/api/user/getAllProducts');
+  test('should handle errors when Stripe throws an exception', async () => {
+    const items = [{ productTitle: 'Test Product', productPrice: 10, quantity: 1 }];
+    stripe.checkout.sessions.create.mockRejectedValueOnce(new Error('Stripe error'));
 
-        expect(response.status).toBe(400);
+    const response = await request(app)
+      .post('/api/create-checkout-session')
+      .send({ items });
 
-        expect(response.body).toEqual({ error: 'Failed to fetch products !!!' });
-    });
+    expect(response.status).toBe(500);
+    expect(response.body).toEqual({ error: 'Stripe error' });
+  });
 
-    test('should return status 201 and products if products exist', async () => {
+  afterAll(async () => {
+    server.close();
 
-    Product.find = jest.fn().mockResolvedValue([
-      { _id: 1, productTitle: 'Product 1', categoryName:"category 1", description:"description 1",
-       shopId:"001", price: 10},
-      { _id: 2, productTitle: 'Product 2', categoryName:"category 2", description:"description 2",
-       shopId:"002", price: 20},
-    ]);
-
-    const response = await request(app).post('/api/user/getAllProducts');
-
-    expect(response.status).toBe(201);
-
-    expect(response.body).toEqual({
-      Products: [
-        {  _id: 1, productTitle: 'Product 1', categoryName:"category 1", description:"description 1",
-        shopId:"001", price: 10},
-        { _id: 2, productTitle: 'Product 2', categoryName:"category 2", description:"description 2",
-        shopId:"002", price: 20},
-      ],
-    });
-
-    });
-
-    afterAll(async () => {
-        server.close();
-
-        await mongoose.disconnect()
-      });
+    await mongoose.disconnect()
+  });
 });
-  
+
